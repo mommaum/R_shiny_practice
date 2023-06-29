@@ -1,0 +1,17 @@
+---
+title: "analysis_report"
+output: html_document
+date: "2023-06-27"
+---
+
+```{r setup, include=FALSE}
+source("~/Desktop/R_shiny_project/single_analysis.R")
+source("~/Desktop/R_shiny_project/utils.R")
+jsonData <- process_data_with_params(input)
+result <- single_process_data(jsonData)
+```
+
+
+```{r}
+result
+```
