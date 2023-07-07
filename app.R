@@ -8,6 +8,8 @@
 # install.packages("thematic")
 # install.packages("magrittr")
 # install.packages("dplyr")
+# install.packages("styler")
+
 
 library(shiny)
 library(ggplot2)
@@ -19,18 +21,20 @@ library(shinyFeedback)
 library(thematic)
 library(magrittr)
 library(dplyr)
+library(styler)
 
 source("api_call.R")
 source("single_analysis.R")
 source("compare_analysis.R")
 source("utils.R")
+source("validation.R")
 
 input_keyword <- function(id) {
   textInput(id, label = "키워드")
 }
 
 general_inputs <- list(
-  dateRangeInput("date_range", "기간", start = Sys.Date() - 365, end = Sys.Date()),
+  dateRangeInput("date_range", "기간", start = Sys.Date() - 90, end = Sys.Date()),
   selectInput(
     inputId = "time_unit",
     label = "구간 단위",
@@ -60,102 +64,131 @@ detail_inputs <- list(
 )
 
 ui <- fluidPage(
-  theme = bslib::bs_theme(bootswatch = "minty"), # 테마 사용
-  useShinyFeedback(), # 피드백 사용
+  theme = bslib::bs_theme(bootswatch = "minty"),
+  # 테마 사용
+  useShinyFeedback(),
+  # 피드백 사용
   titlePanel("네이버 검색어 분석기"),
   tabsetPanel(
-    tabPanel("검색어 분석",
-             sidebarLayout(
-               sidebarPanel(
-                 general_inputs,
-                 input_keyword("keyword"),
-                 textOutput("empty_input_warning"),
-                 textOutput("date_order_warning"),
-                 detail_inputs,
-                 actionButton(inputId = "submit", label = "입력 확인"),
-                 downloadButton("download_report")
-               ),
-               mainPanel(plotOutput("single_plot"),
-                         textOutput("single_analysis"),)
-             ),),
-    tabPanel("검색어 비교",
-             sidebarLayout(
-               sidebarPanel(
-                 general_inputs,
-                 input_keyword("keyword_1"),
-                 input_keyword("keyword_2"),
-                 detail_inputs,
-                 actionButton(inputId = "submit_2", label = "입력 확인"),
-               ),
-               mainPanel(
-                 plotOutput("compare_plot"),
-                 plotOutput("scatter_plot"),
-                 textOutput("cor")
-               )
-             )),
-    tabPanel("검색기록",)
+    tabPanel(
+      "추세 확인",
+      sidebarLayout(
+        sidebarPanel(
+          general_inputs,
+          input_keyword("keyword"),
+          textOutput("empty_input_warning"),
+          textOutput("date_order_warning"),
+          detail_inputs,
+          actionButton(inputId = "submit", label = "입력 확인"),
+        ),
+        mainPanel(
+          plotOutput("single_plot"),
+          textOutput("single_analysis"),
+          conditionalPanel(
+            condition = "input.submit > 0",
+            downloadButton("download_report", "보고서 다운로드")
+          )
+        )
+      ),
+    ),
+    tabPanel(
+      "검색어 비교",
+      sidebarLayout(
+        sidebarPanel(
+          general_inputs,
+          input_keyword("keyword_1"),
+          input_keyword("keyword_2"),
+          detail_inputs,
+          actionButton(inputId = "submit_2", label = "입력 확인"),
+          textOutput("empty_input_warning_1"),
+          textOutput("empty_input_warning_2"),
+        ),
+        mainPanel(
+          plotOutput("compare_plot"),
+          plotOutput("scatter_plot"),
+          textOutput("cor")
+        )
+      )
+    ),
   ),
 )
 
 server <- function(input, output, session) {
   thematic::thematic_shiny()
-  
-  check_empty_input <- reactive({
-    is_empty <- input$keyword == ""
-    shinyFeedback::feedbackWarning("keyword", is_empty, "검색어를 입력해주세요.")
-  })
-  
-  validate_date_order <- reactive({
-    wrong_date_order <- input$date_range[1] > input$date_range[2]
-    shinyFeedback::feedbackWarning("date_range", wrong_date_order, "검색 시작 날짜가 더 빨라야 합니다.")
-  })
-  
-  output$empty_input_warning <- renderText(check_empty_input())
-  output$date_order_warning <- renderText(validate_date_order())
-  
+
+  output$date_order_warning <-
+    renderText(validate_date_order(input))
+
+  output$empty_input_warning <-
+    renderText(check_empty_input(input, "keyword"))
+  output$empty_input_warning_1 <-
+    renderText(check_empty_input(input, "keyword_1"))
+  output$empty_input_warning_2 <-
+    renderText(check_empty_input(input, "keyword_2"))
+
+  observeEvent(input$closeModal, removeModal())
+
   observeEvent(input$submit, {
-    single_analysis <-
-      input %>% process_data_with_params() %>% analysis_single_data()
-    
-    output$single_analysis <- renderText({
-      single_analysis$trend_analysis_result
-    })
-    output$single_plot <- renderPlot({
-      single_analysis$graph
-    })
-    output$download_report <- downloadHandler(
-      filename = "report.html",
-      content = function(file) {
-        
-        id <- showNotification(
-          "리포트 작성중...",
-          duration = NULL,
-          closeButton = FALSE
-        )
-        on.exit(removeNotification(id), add = TRUE)
-        rmarkdown::render(
-          "report.Rmd",
-          output_file = file
-        )
-      }
-    )
+    if (input$keyword != "") {
+      id <-
+        showNotification("분석 중...", duration = NULL, closeButton = FALSE)
+      on.exit(removeNotification(id), add = TRUE)
+
+      single_analysis <-
+        input %>%
+        process_data_with_params() %>%
+        analysis_single_data()
+
+      output$single_analysis <-
+        renderText(single_analysis$trend_analysis_result)
+      output$single_plot <- renderPlot(single_analysis$graph)
+
+      output$download_report <- downloadHandler(
+        filename = "report.html",
+        content = function(file) {
+          id <- showNotification("리포트 작성중...",
+            duration = NULL,
+            closeButton = FALSE
+          )
+          on.exit(removeNotification(id), add = TRUE)
+          rmarkdown::render("report.Rmd",
+            output_file = file
+          )
+        }
+      )
+    } else {
+      showModal(modalDialog(
+        title = "경고",
+        "키워드를 입력하세요.",
+        easyClose = TRUE,
+        footer = tagList(actionButton("closeModal", "닫기"))
+      ))
+    }
   })
-  
+
   observeEvent(input$submit_2, {
-    params <- process_data_with_params(input)
-    
-    compare_analysis <-
-      compare_process_data(params)
-    
-    output$scatter_plot <- renderPlot({
-      compare_analysis$scatter_plot
-    })
-    output$compare_plot <- renderPlot({
-      compare_analysis$graph
-    })
-    output$cor <- renderText({
-      compare_analysis$cor
-    })
+    if (input$keyword_1 != "" && input$keyword_2 != "") {
+      jsonData <- process_data_with_params_2(input)
+      compare_analysis <-
+        compare_process_data(jsonData)
+
+      output$scatter_plot <- renderPlot({
+        compare_analysis$scatter_plot
+      })
+      output$compare_plot <- renderPlot({
+        compare_analysis$graph
+      })
+      output$cor <- renderText({
+        compare_analysis$cor
+      })
+    } else {
+      showModal(modalDialog(
+        title = "경고",
+        "키워드를 입력하세요.",
+        easyClose = TRUE,
+        footer = tagList(actionButton("closeModal", "닫기"))
+      ))
+    }
   })
 }
 
