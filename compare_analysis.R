@@ -10,9 +10,13 @@ compare_process_data <-
     parsed_data_frame$period.1 <-
       as.Date(parsed_data_frame$period.1)
 
+    print(parsed_data_frame)
+
     graph <- ggplot(parsed_data_frame, aes(x = period)) +
-      geom_line(aes(y = ratio, color = "blue")) +
-      geom_line(aes(y = ratio.1, color = "red")) +
+      geom_line(aes(y = ratio, color = "1번")) +
+      geom_line(aes(y = ratio.1, color = "2번")) +
+      xlab("date") +
+      ylab("search volume") +
       scale_y_continuous(limits = c(0, 100), breaks = seq(0, 100, 20))
 
     scatter_plot <-

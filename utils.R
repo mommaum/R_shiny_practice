@@ -28,7 +28,7 @@ process_data_with_params <- function(input) {
 
   jsonData <- toJSON(params, auto_unbox = TRUE)
 
-
+  print(jsonData)
   return(jsonData)
 }
 

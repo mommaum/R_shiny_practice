@@ -9,6 +9,9 @@
 # install.packages("magrittr")
 # install.packages("dplyr")
 # install.packages("styler")
+# install.packages("waiter")
+# install.packages("reactlog")
+# install.packages("shinyloadtest")
 
 
 library(shiny)
@@ -22,19 +25,26 @@ library(thematic)
 library(magrittr)
 library(dplyr)
 library(styler)
+library(waiter)
+library(reactlog)
+library(shinyloadtest)
+library(future)
+library(promises)
 
 source("api_call.R")
 source("single_analysis.R")
 source("compare_analysis.R")
 source("utils.R")
 source("validation.R")
+source("modal.R")
+source("news_crawler.R")
 
 input_keyword <- function(id) {
   textInput(id, label = "키워드")
 }
 
 general_inputs <- list(
-  dateRangeInput("date_range", "기간", start = Sys.Date() - 90, end = Sys.Date()),
+  dateRangeInput("date_range", "기간", start = Sys.Date() - 7, end = Sys.Date()),
   selectInput(
     inputId = "time_unit",
     label = "구간 단위",
@@ -64,35 +74,33 @@ detail_inputs <- list(
 )
 
 ui <- fluidPage(
-  theme = bslib::bs_theme(bootswatch = "minty"),
-  # 테마 사용
+  theme = bslib::bs_theme(bootswatch = "darkly"),
   useShinyFeedback(),
-  # 피드백 사용
-  titlePanel("네이버 검색어 분석기"),
+  titlePanel("네이버 검색어 분석"),
   tabsetPanel(
     tabPanel(
-      "추세 확인",
+      "검색어 분석하기",
       sidebarLayout(
         sidebarPanel(
           general_inputs,
           input_keyword("keyword"),
+          detail_inputs,
+          actionButton("submit", "분석하기"),
+          actionButton("reset", "설정 초기화"),
           textOutput("empty_input_warning"),
           textOutput("date_order_warning"),
-          detail_inputs,
-          actionButton(inputId = "submit", label = "입력 확인"),
+          uiOutput("download_report"),
         ),
         mainPanel(
           plotOutput("single_plot"),
           textOutput("single_analysis"),
-          conditionalPanel(
-            condition = "input.submit > 0",
-            downloadButton("download_report", "보고서 다운로드")
-          )
+          verbatimTextOutput("single_analysis_description"),
+          tableOutput("word_freq_data_frame"),
         )
       ),
     ),
     tabPanel(
-      "검색어 비교",
+      "검색어 비교하기",
       sidebarLayout(
         sidebarPanel(
           general_inputs,
@@ -114,7 +122,7 @@ ui <- fluidPage(
 )
 
 server <- function(input, output, session) {
-  thematic::thematic_shiny()
+  thematic_shiny()
 
   output$date_order_warning <-
     renderText(validate_date_order(input))
@@ -128,10 +136,17 @@ server <- function(input, output, session) {
 
   observeEvent(input$closeModal, removeModal())
 
+  observeEvent(input$reset, {
+    updateTextInput(session, "keyword", value = "")
+    updateRadioButtons(session, "device", selected = "전체")
+    updateRadioButtons(session, "gender", selected = "전체")
+    updateRadioButtons(session, "ages", selected = "전체")
+  })
+
   observeEvent(input$submit, {
     if (input$keyword != "") {
       id <-
-        showNotification("분석 중...", duration = NULL, closeButton = FALSE)
+        showNotification("분석 중...", type = "message", duration = NULL, closeButton = FALSE)
       on.exit(removeNotification(id), add = TRUE)
 
       single_analysis <-
@@ -139,11 +154,20 @@ server <- function(input, output, session) {
         process_data_with_params() %>%
         analysis_single_data()
 
+      output$download_report <- renderUI(downloadButton("download_report", "보고서 다운로드"))
+
+      word_freq_table <- input %>% news_crawl()
+
+      output$word_freq_data_frame <- renderTable(word_freq_table)
+
       output$single_analysis <-
         renderText(single_analysis$trend_analysis_result)
       output$single_plot <- renderPlot(single_analysis$graph)
+      output$single_analysis_description <- renderPrint({
+        cat("Augmented Dickey-Fuller 검정을 사용하였습니다.\n 유의성 5% 에서 검정")
+      })
 
-      output$download_report <- downloadHandler(
+      downloadHandler(
         filename = "report.html",
         content = function(file) {
           id <- showNotification("리포트 작성중...",
@@ -157,12 +181,7 @@ server <- function(input, output, session) {
         }
       )
     } else {
-      showModal(modalDialog(
-        title = "경고",
-        "키워드를 입력하세요.",
-        easyClose = TRUE,
-        footer = tagList(actionButton("closeModal", "닫기"))
-      ))
+      showModal(create_modal("안내", "키워드가 비어있습니다."))
     }
   })
 
@@ -182,12 +201,7 @@ server <- function(input, output, session) {
         compare_analysis$cor
       })
     } else {
-      showModal(modalDialog(
-        title = "경고",
-        "키워드를 입력하세요.",
-        easyClose = TRUE,
-        footer = tagList(actionButton("closeModal", "닫기"))
-      ))
+      showModal(create_modal("안내", "키워드가 비어있습니다"))
     }
   })
 }
