@@ -7,12 +7,11 @@ analysis_single_data <-
       jsonData %>% send_post_request()
 
     object_data <- fromJSON(parsed_data)
-
+    
     if (length(object_data$results[3][[1]][[1]]) == 0) {
-      message("no way!")
       showModal(modalDialog(
         title = "경고",
-        "감색결과가 없습니다. 다른 검색어를 입력하세요",
+        "결과가 수집되지 않는 검색어입니다. 다른 검색어를 입력하세요",
         easyClose = TRUE,
         footer = tagList(actionButton("closeModal", "닫기"))
       ))
@@ -25,7 +24,8 @@ analysis_single_data <-
         .$results$data
       } %>%
       as.data.frame() %>%
-      mutate(period = as.Date(period)) %>% print()
+      mutate(period = as.Date(period)) %>%
+      print()
 
     adf_result <-
       adf.test(parsed_data_frame$ratio,

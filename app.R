@@ -12,7 +12,7 @@
 # install.packages("waiter")
 # install.packages("reactlog")
 # install.packages("shinyloadtest")
-
+# install.packages('wordcloud2')
 
 library(shiny)
 library(ggplot2)
@@ -28,8 +28,7 @@ library(styler)
 library(waiter)
 library(reactlog)
 library(shinyloadtest)
-library(future)
-library(promises)
+library(wordcloud2)
 
 source("api_call.R")
 source("single_analysis.R")
@@ -38,44 +37,13 @@ source("utils.R")
 source("validation.R")
 source("modal.R")
 source("news_crawler.R")
-
-input_keyword <- function(id) {
-  textInput(id, label = "키워드")
-}
-
-general_inputs <- list(
-  dateRangeInput("date_range", "기간", start = Sys.Date() - 7, end = Sys.Date()),
-  selectInput(
-    inputId = "time_unit",
-    label = "구간 단위",
-    choices = c("일간" = "date", "주간" = "week", "월간" = "month")
-  )
-)
-
-detail_inputs <- list(
-  radioButtons(
-    inputId = "device",
-    label = "기기",
-    choices = c("전체", "pc", "mo"),
-    selected = "전체"
-  ),
-  radioButtons(
-    inputId = "gender",
-    label = "성별",
-    choices = c("전체", "남성", "여성"),
-    selected = "전체"
-  ),
-  radioButtons(
-    inputId = "ages",
-    label = "나이",
-    choices = c("전체", "미성년", "20대", "30대", "40대", "50대", "60대 이상"),
-    selected = "전체"
-  )
-)
+source("inputs.R")
 
 ui <- fluidPage(
-  theme = bslib::bs_theme(bootswatch = "darkly"),
+  theme = bslib::bs_theme(bootswatch = "minty"),
   useShinyFeedback(),
+
+  # UI 구성
   titlePanel("네이버 검색어 분석"),
   tabsetPanel(
     tabPanel(
@@ -89,13 +57,22 @@ ui <- fluidPage(
           actionButton("reset", "설정 초기화"),
           textOutput("empty_input_warning"),
           textOutput("date_order_warning"),
-          uiOutput("download_report"),
         ),
         mainPanel(
-          plotOutput("single_plot"),
-          textOutput("single_analysis"),
+          textOutput("single_analysis_explain"),
           verbatimTextOutput("single_analysis_description"),
-          tableOutput("word_freq_data_frame"),
+          verbatimTextOutput("single_analysis"),
+          plotOutput("single_plot"),
+          verbatimTextOutput("word_freq_analysis_description"),
+          fluidRow(
+            column(width = 4,
+                   tableOutput("word_freq_data_frame")
+            ),
+            column(width = 8,
+                   wordcloud2Output("wordcloud_output")
+            )
+          ),
+          # uiOutput("download_report"),
         )
       ),
     ),
@@ -112,9 +89,11 @@ ui <- fluidPage(
           textOutput("empty_input_warning_2"),
         ),
         mainPanel(
+          textOutput("compare_analysis_explain"),
           plotOutput("compare_plot"),
+          verbatimTextOutput("cor_information"),
+          textOutput("cor"),
           plotOutput("scatter_plot"),
-          textOutput("cor")
         )
       )
     ),
@@ -124,6 +103,9 @@ ui <- fluidPage(
 server <- function(input, output, session) {
   thematic_shiny()
 
+  output$single_analysis_explain <- renderText("분석하고 싶은 키워드를 입력해보세요 ! 검색량 추세 및 네이버 뉴스 크롤링 데이터 제공합니다")
+  output$compare_analysis_explain <- renderText("두 검색어 간의 검색량 비율과 상관관계를 분석합니다")
+  
   output$date_order_warning <-
     renderText(validate_date_order(input))
 
@@ -145,10 +127,6 @@ server <- function(input, output, session) {
 
   observeEvent(input$submit, {
     if (input$keyword != "") {
-      id <-
-        showNotification("분석 중...", type = "message", duration = NULL, closeButton = FALSE)
-      on.exit(removeNotification(id), add = TRUE)
-
       single_analysis <-
         input %>%
         process_data_with_params() %>%
@@ -156,37 +134,51 @@ server <- function(input, output, session) {
 
       output$download_report <- renderUI(downloadButton("download_report", "보고서 다운로드"))
 
-      word_freq_table <- input %>% news_crawl()
+      output$wordcloud_output <- renderWordcloud2({
+        wordcloud2(word_freq_table)
+      })
 
+      word_freq_table <- input %>% news_crawl()
       output$word_freq_data_frame <- renderTable(word_freq_table)
 
       output$single_analysis <-
-        renderText(single_analysis$trend_analysis_result)
+        renderPrint(single_analysis$trend_analysis_result)
       output$single_plot <- renderPlot(single_analysis$graph)
       output$single_analysis_description <- renderPrint({
-        cat("Augmented Dickey-Fuller 검정을 사용하였습니다.\n 유의성 5% 에서 검정")
+        cat("검색량 추세 확인을 위한 시계열 분석 \nAugmented Dickey-Fuller 검정을 사용하였습니다. (유의성 5%)")
       })
 
-      downloadHandler(
-        filename = "report.html",
-        content = function(file) {
-          id <- showNotification("리포트 작성중...",
-            duration = NULL,
-            closeButton = FALSE
-          )
-          on.exit(removeNotification(id), add = TRUE)
-          rmarkdown::render("report.Rmd",
-            output_file = file
-          )
-        }
-      )
+      output$word_freq_analysis_description <- renderPrint({
+        cat("키워드로 검색한 네이버 뉴스 제목을 크롤링하여 자주 등장하는 단어들을 모았습니다.\n30개의 기사를 검색했습니다 (관련성 기준).")
+      })
+
+      # 보고서 다운로드
+      # downloadHandler(
+      #   filename = "report.html",
+      #   content = function(file) {
+      #     id <- showNotification("리포트 작성중...",
+      #       duration = NULL,
+      #       closeButton = FALSE
+      #     )
+      #     on.exit(removeNotification(id), add = TRUE)
+      #     rmarkdown::render("report.Rmd",
+      #       output_file = file
+      #     )
+      #   }
+      # )
+      
     } else {
       showModal(create_modal("안내", "키워드가 비어있습니다."))
     }
   })
 
+
   observeEvent(input$submit_2, {
     if (input$keyword_1 != "" && input$keyword_2 != "") {
+      
+      id <- showNotification("분석중 ...", duration = NULL, closeButton = FALSE)
+      on.exit(removeNotification(id), add = TRUE)
+      
       jsonData <- process_data_with_params_2(input)
       compare_analysis <-
         compare_process_data(jsonData)
@@ -200,6 +192,8 @@ server <- function(input, output, session) {
       output$cor <- renderText({
         compare_analysis$cor
       })
+
+      output$cor_information <- renderPrint(cat("|상관계수| >= 0.7 : 강한 상관관계 \n0.7 > |상관계수| > 0.3: 약한 상관관계 \n|상관계수| <= 0.3: 상관관계 없음"))
     } else {
       showModal(create_modal("안내", "키워드가 비어있습니다"))
     }
