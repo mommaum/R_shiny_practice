@@ -72,7 +72,6 @@ ui <- fluidPage(
                    wordcloud2Output("wordcloud_output")
             )
           ),
-          # uiOutput("download_report"),
         )
       ),
     ),
@@ -97,6 +96,9 @@ ui <- fluidPage(
         )
       )
     ),
+    tabPanel(
+      "데이터베이스"
+    )
   ),
 )
 
