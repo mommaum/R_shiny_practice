@@ -15,7 +15,7 @@ analysis_single_data <-
     if (length(object_data$results[3][[1]][[1]]) == 0) {
       showModal(modalDialog(
         title = "경고",
-        "결과가 수집되지 않는 검색어입니다. 다른 검색어를 입력하세요",
+        "추세 결과를 수집할 수 없는 검색어입니다.",
         easyClose = TRUE,
         footer = tagList(actionButton("closeModal", "닫기"))
       ))
@@ -35,7 +35,7 @@ analysis_single_data <-
     if (date_range != nrow(parsed_data_frame)) {
       showModal(modalDialog(
         title = "경고",
-        "검색 결과가 일부 누락되어 계산이 불가능한 검색어입니다. 다른 검색어를 입력하세요",
+        "검색 결과가 일부 누락되어 추세 계산이 불가능한 검색어입니다.",
         easyClose = TRUE,
         footer = tagList(actionButton("closeModal", "닫기"))
       ))

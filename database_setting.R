@@ -60,5 +60,5 @@ connect_to_db <- function() {
 
 # print(result)
 
-dbSendQuery(db, "DELETE FROM keyword WHERE 키워드 = '강동구 맛집';")
+# dbSendQuery(db, "DELETE FROM keyword WHERE 키워드 = '버넥트 청약일';")
 

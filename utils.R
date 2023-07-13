@@ -38,13 +38,17 @@ process_data_with_params <- function(input) {
 }
 
 process_data_with_params_2 <- function(input) {
+  
+  keyword_1 <- gsub("\\s+", "", input$keyword_1)
+  keyword_2 <- gsub("\\s+", "", input$keyword_2)
+  
   params <- list(
     startDate = as.character(input$date_range[1]),
     endDate = as.character(input$date_range[2]),
     timeUnit = input$time_unit,
     keywordGroups = list(
-      list(groupName = input$keyword_1, keywords = list(input$keyword_1)),
-      list(groupName = input$keyword_2, keywords = list(input$keyword_2))
+      list(groupName = keyword_1, keywords = list(keyword_1)),
+      list(groupName = keyword_2, keywords = list(keyword_2))
     )
   )
 
