@@ -29,6 +29,10 @@ library(waiter)
 library(reactlog)
 library(shinyloadtest)
 library(wordcloud2)
+library(RMySQL)
+library(DBI)
+library(tidyverse)
+library(ragg)
 
 source("api_call.R")
 source("single_analysis.R")
@@ -38,6 +42,9 @@ source("validation.R")
 source("modal.R")
 source("news_crawler.R")
 source("inputs.R")
+source("database_insert.R")
+source("global.R")
+source("update_query.R")
 
 ui <- fluidPage(
   theme = bslib::bs_theme(bootswatch = "minty"),
@@ -65,11 +72,13 @@ ui <- fluidPage(
           plotOutput("single_plot"),
           verbatimTextOutput("word_freq_analysis_description"),
           fluidRow(
-            column(width = 4,
-                   tableOutput("word_freq_data_frame")
+            column(
+              width = 4,
+              tableOutput("word_freq_data_frame")
             ),
-            column(width = 8,
-                   wordcloud2Output("wordcloud_output")
+            column(
+              width = 8,
+              wordcloud2Output("wordcloud_output")
             )
           ),
         )
@@ -97,17 +106,30 @@ ui <- fluidPage(
       )
     ),
     tabPanel(
-      "데이터베이스"
+      "데이터베이스",
+      sidebarLayout(
+        sidebarPanel(
+          radioButtons("type_of_searching", "검색방법", choiceNames = c("키워드로", "연관검색어로"), choiceValues = c("keyword", "related")),
+          textInput("search_by_keyword", "검색"),
+          # dateInput("search_by_date", "날짜로찾기"),
+          radioButtons("sort_by_keyword", "정렬", choiceNames = c("없음", "오름차순", "내림차순"), choiceValues = c("", "ORDER BY 키워드 ASC", "ORDER BY 키워드 DESC")),
+          radioButtons("search_by_trend", "추세로찾기", choiceNames = c("전부", "없음", "상승", "하락"), choiceValues = c("", "트렌드 = \"없음\"", "트렌드 = \"상승\"", "트렌드 = \"하락\"")),
+          actionButton("reset_search_condition", "설정 초기화"),
+        ),
+        mainPanel(
+          actionButton(inputId = "submit_3", label = "DB 갱신"),
+          tableOutput("database")
+        )
+      )
     )
   ),
 )
 
 server <- function(input, output, session) {
   thematic_shiny()
-
   output$single_analysis_explain <- renderText("분석하고 싶은 키워드를 입력해보세요 ! 검색량 추세 및 네이버 뉴스 크롤링 데이터 제공합니다")
   output$compare_analysis_explain <- renderText("두 검색어 간의 검색량 비율과 상관관계를 분석합니다")
-  
+
   output$date_order_warning <-
     renderText(validate_date_order(input))
 
@@ -129,10 +151,9 @@ server <- function(input, output, session) {
 
   observeEvent(input$submit, {
     if (input$keyword != "") {
-      single_analysis <-
+      jsonData <-
         input %>%
-        process_data_with_params() %>%
-        analysis_single_data()
+        process_data_with_params()
 
       output$download_report <- renderUI(downloadButton("download_report", "보고서 다운로드"))
 
@@ -140,8 +161,15 @@ server <- function(input, output, session) {
         wordcloud2(word_freq_table)
       })
 
-      word_freq_table <- input %>% news_crawl()
-      output$word_freq_data_frame <- renderTable(word_freq_table)
+      word_freq_table <- input %>%
+        news_crawl() %>%
+        print()
+
+      output$word_freq_data_frame <- renderTable(
+        word_freq_table
+      )
+
+      single_analysis <- analysis_single_data(jsonData, input)
 
       output$single_analysis <-
         renderPrint(single_analysis$trend_analysis_result)
@@ -168,22 +196,23 @@ server <- function(input, output, session) {
       #     )
       #   }
       # )
-      
     } else {
       showModal(create_modal("안내", "키워드가 비어있습니다."))
     }
+
+    data_insert(input, single_analysis$trend, word_freq_table)
+    database <- renderTable(dbGetQuery(db, "SELECT * FROM keyword"))
   })
 
 
   observeEvent(input$submit_2, {
     if (input$keyword_1 != "" && input$keyword_2 != "") {
-      
       id <- showNotification("분석중 ...", duration = NULL, closeButton = FALSE)
       on.exit(removeNotification(id), add = TRUE)
-      
+
       jsonData <- process_data_with_params_2(input)
       compare_analysis <-
-        compare_process_data(jsonData)
+        compare_process_data(jsonData, input)
 
       output$scatter_plot <- renderPlot({
         compare_analysis$scatter_plot
@@ -199,6 +228,24 @@ server <- function(input, output, session) {
     } else {
       showModal(create_modal("안내", "키워드가 비어있습니다"))
     }
+  })
+
+  observeEvent(input$submit_3, {
+    dbGetQuery(db, "select * from keyword")
+  })
+q
+  observeEvent(input$reset_search_condition, {
+    updateTextInput(session, "search_by_keyword", value = "")
+    updateRadioButtons(session, "sort_by_keyword", selected = "")
+    updateRadioButtons(session, "search_by_trend", selected = "")
+  })
+
+  query <- reactive({
+    update_query(input)
+  })
+
+  output$database <- renderTable({
+    dbGetQuery(db, query())
   })
 }
 

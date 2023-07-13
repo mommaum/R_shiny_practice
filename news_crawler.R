@@ -23,8 +23,6 @@ news_crawl <- function(input) {
 
       data <- GET(url)
 
-      print(data$status_code)
-
       if (data$status_code != 200) {
         break
       }
@@ -47,16 +45,13 @@ news_crawl <- function(input) {
       word_counts <- c(word_counts, unlist(words))
 
       counter <- counter + 1
-      print(title)
       incProgress(1 / 30)
+      print(counter)
     }
   })
 
-
   word_freq <- table(word_counts)
-  filtered_freq <- word_freq[word_freq > 1]
-  sorted_freq <- sort(filtered_freq, decreasing = TRUE) %>% as.data.frame()
+  sorted_freq <- sort(word_freq, decreasing = TRUE) %>% as.data.frame()
 
-  print(sorted_freq)
   return(sorted_freq)
 }

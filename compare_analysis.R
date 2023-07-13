@@ -1,14 +1,17 @@
+library(RMySQL)
+library(DBI)
+
 source("api_call.R")
 
 compare_process_data <-
-  function(jsonData) {
+  function(jsonData, input) {
     response <- send_post_request(jsonData)
-    
+
     object_data <- fromJSON(response)
-    
+
     print(object_data$results[3][[1]][[1]])
     print(object_data$results[3][[1]][[2]])
-    
+
     if (length(object_data$results[3][[1]][[1]]) == 0 || length(object_data$results[3][[1]][[2]]) == 0) {
       showModal(modalDialog(
         title = "경고",
@@ -40,6 +43,7 @@ compare_process_data <-
       coord_fixed(ratio = max(parsed_data_frame$ratio) / max(parsed_data_frame$ratio.1))
 
     correlation <- round(cor(parsed_data_frame$ratio, parsed_data_frame$ratio.1), 2)
+    cor <- cor(parsed_data_frame$ratio, parsed_data_frame$ratio.1)
 
 
     if (correlation >= -0.3 && correlation <= 0.3) {
@@ -51,6 +55,10 @@ compare_process_data <-
     } else {
       correlation <- paste(correlation, "강한 상관관계가 있습니다.")
     }
+
+    # query <- paste0("INSERT INTO keyword VALUE(", '"', input$keyword_1, '"', "," , '"', input$keyword_2, '"', ",", cor, ")")
+    #
+    # dbGetQuery(db, query)
 
     return(list(
       scatter_plot = scatter_plot,

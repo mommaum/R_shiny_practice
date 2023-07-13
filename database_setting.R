@@ -20,20 +20,20 @@ db <- dbConnect(
   port = as.numeric(db_port)
 )
 
-dbSendQuery(db, "CREATE TABLE keyword(
-            ID int,
-            keyword char,
-            keyword_2 char,
-            start_date date,
-            end_date date,
-            cor double
+dbSendQuery(db, "CREATE TABLE keyword (
+            키워드 VARCHAR(20),
+            검색일 DATE,
+            트렌드 VARCHAR(20),
+            연관검색어 VARCHAR(20),
+            연관검색어_2 VARCHAR(20),
+            연관검색어_3 VARCHAR(20),
+            연관검색어_4 VARCHAR(20)
             )")
 
-dbListTables(db) %>% print()
+dbDisconnect(db)
+dbSendQuery(db, "DROP TABLE keyword")
+dbGetQuery(db, "select * from keyword")
+dbGetQuery(db, "SHOW TABLES")
+dbGetQuery(db, "SHOW COLUMNS FROM keyword")
 
-result <- dbGetQuery(
-  db,
-  "select * from keyword;"
-)
-
-print(result)
+# print(result)
