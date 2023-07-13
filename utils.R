@@ -1,11 +1,14 @@
 process_data_with_params <- function(input) {
+  
+  keyword <- gsub("\\s+", "", input$keyword)
+  
   params <- list(
     startDate = as.character(input$date_range[1]),
     endDate = as.character(input$date_range[2]),
     timeUnit = input$time_unit,
     keywordGroups = list(list(
-      groupName = input$keyword,
-      keywords = list(input$keyword)
+      groupName = keyword,
+      keywords = list(keyword)
     ))
   )
 
@@ -25,6 +28,8 @@ process_data_with_params <- function(input) {
   } else if (input$ages == "60대 이상") {
     params$ages <- list("11")
   }
+  
+  print(params)
 
   jsonData <- toJSON(params, auto_unbox = TRUE)
 
@@ -60,6 +65,8 @@ process_data_with_params_2 <- function(input) {
     params$ages <- list("11")
   }
 
+  print(params)
+  
   jsonData <- toJSON(params, auto_unbox = TRUE)
 
   return(jsonData)

@@ -1,7 +1,4 @@
 data_insert <- function(input, trend, related) {
-  if (nrow(related) == 0) {
-    return()
-  }
 
   query <-
     paste0(

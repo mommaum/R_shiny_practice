@@ -5,7 +5,7 @@ account: naver-keyword-analysis
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 9405265
-bundleId: 7447817
+bundleId: 7451763
 url: https://naver-keyword-analysis.shinyapps.io/r_shiny_practice/
-when: 1689157248.89728
-lastSyncTime: 1689157248.8973
+when: 1689238851.94764
+lastSyncTime: 1689238851.94766

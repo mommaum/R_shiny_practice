@@ -9,9 +9,9 @@ analysis_single_data <-
   function(jsonData, input) {
     parsed_data <-
       jsonData %>% send_post_request()
-
+    
     object_data <- fromJSON(parsed_data)
-
+  
     if (length(object_data$results[3][[1]][[1]]) == 0) {
       showModal(modalDialog(
         title = "경고",
@@ -30,6 +30,18 @@ analysis_single_data <-
       as.data.frame() %>%
       mutate(period = as.Date(period))
 
+    date_range <- input$date_range[2] - input$date_range[1]
+    
+    if (date_range != nrow(parsed_data_frame)) {
+      showModal(modalDialog(
+        title = "경고",
+        "검색 결과가 일부 누락되어 계산이 불가능한 검색어입니다. 다른 검색어를 입력하세요",
+        easyClose = TRUE,
+        footer = tagList(actionButton("closeModal", "닫기"))
+      ))
+      return(NULL)
+    }
+    
     adf_result <-
       adf.test(parsed_data_frame$ratio,
         alternative = "stationary",

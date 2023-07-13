@@ -45,6 +45,7 @@ source("inputs.R")
 source("database_insert.R")
 source("global.R")
 source("update_query.R")
+source("database_setting.R")
 
 ui <- fluidPage(
   theme = bslib::bs_theme(bootswatch = "minty"),
@@ -117,6 +118,7 @@ ui <- fluidPage(
           actionButton("reset_search_condition", "설정 초기화"),
         ),
         mainPanel(
+          textOutput("database_guide"),
           actionButton(inputId = "submit_3", label = "DB 갱신"),
           tableOutput("database")
         )
@@ -150,7 +152,9 @@ server <- function(input, output, session) {
   })
 
   observeEvent(input$submit, {
+    
     if (input$keyword != "") {
+    
       jsonData <-
         input %>%
         process_data_with_params()
@@ -161,9 +165,7 @@ server <- function(input, output, session) {
         wordcloud2(word_freq_table)
       })
 
-      word_freq_table <- input %>%
-        news_crawl() %>%
-        print()
+      word_freq_table <-  news_crawl(input)
 
       output$word_freq_data_frame <- renderTable(
         word_freq_table
@@ -179,7 +181,7 @@ server <- function(input, output, session) {
       })
 
       output$word_freq_analysis_description <- renderPrint({
-        cat("키워드로 검색한 네이버 뉴스 제목을 크롤링하여 자주 등장하는 단어들을 모았습니다.\n30개의 기사를 검색했습니다 (관련성 기준).")
+        cat("키워드로 검색한 네이버 뉴스 제목을 크롤링하여 자주 등장하는 단어들을 모았습니다.\n10개의 기사를 검색했습니다 (관련성 기준).")
       })
 
       # 보고서 다운로드
@@ -232,14 +234,17 @@ server <- function(input, output, session) {
 
   observeEvent(input$submit_3, {
     dbGetQuery(db, "select * from keyword")
+    output$database <- renderTable({
+      dbGetQuery(db, query())
+    })
   })
-q
+  
   observeEvent(input$reset_search_condition, {
     updateTextInput(session, "search_by_keyword", value = "")
     updateRadioButtons(session, "sort_by_keyword", selected = "")
     updateRadioButtons(session, "search_by_trend", selected = "")
   })
-
+  
   query <- reactive({
     update_query(input)
   })
@@ -247,6 +252,8 @@ q
   output$database <- renderTable({
     dbGetQuery(db, query())
   })
+  
+  output$database_guide <- renderText("검색어 분석하기 탭의 결과가 저장됩니다. ")
 }
 
 shinyApp(ui = ui, server = server)
